@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Calendar</string>
+    <string name="title_activity_font_size_page">FontSizePage</string>
+    <string name="title_activity_display_settings">DisplaySettings</string>
+    <string name="title_activity_event">EventActivity</string>
+    <string name="title_activity_calender">CalenderActivity</string>
+    <string name="title_activity_newcalender">newcalender</string>
+    <string name="title_activity_holidays">HolidaysActivity</string>
+    <string name="title_activity_color_theme">Color_Theme</string>
+    <string name="title_activity_setting_page">SettingPage</string>
+    <string name="title_activity_selected_date">selectedDate</string>
+</resources>

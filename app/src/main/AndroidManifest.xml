@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Calendar">
+        <activity
+            android:name=".SelectedDateActivity"
+            android:exported="false"
+            android:label="@string/title_activity_selected_date"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".EventActivity"
+            android:exported="false"
+            android:label="@string/title_activity_setting_page"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".DisplaySettingsActivity"
+            android:exported="false"
+            android:label="@string/title_activity_display_settings"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".SettingPage"
+            android:exported="false"
+            android:label="@string/title_activity_color_theme"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".HolidaysActivity"
+            android:exported="false"
+            android:label="@string/title_activity_holidays"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".newcalender"
+            android:exported="false"
+            android:label="@string/title_activity_newcalender"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".CalenderActivity"
+            android:exported="false"
+            android:label="@string/title_activity_calender"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".FirstPages.FontSizePage"
+            android:exported="false"
+            android:label="@string/title_activity_event"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".Color_Theme"
+            android:exported="false"
+            android:label="@string/title_activity_font_size_page"
+            android:theme="@style/Theme.Calendar" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Calendar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
