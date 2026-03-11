@@ -25,7 +25,10 @@ data class EventEntity(
     val startstime: String?,
     val endtime: String?,
     val calendarId: Int,
-    val color: Int = 0
+    val color: Int = 0,
+    val location: String? = "",
+    val url: String? = "",
+    val note: String? = ""
 )
 
 

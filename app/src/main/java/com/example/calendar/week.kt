@@ -2,8 +2,11 @@ package com.example.calendar
 
 import android.content.Intent
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -33,23 +37,19 @@ import java.util.Locale
 
 @Composable
 fun WeekCalendar(
-    eventsMap: Map<LocalDate, List<EventEntity>> = emptyMap(), // NOTE: keys MUST be LocalDate
+    eventsMap: Map<LocalDate, List<EventEntity>> = emptyMap(),
     selectedDate: LocalDate,
     modifier: Modifier = Modifier,
     selectedDayEvents: List<EventEntity>
 ) {
-    // week days (Mon..Sun) based on selectedDate
     val startOfWeek = selectedDate.with(DayOfWeek.MONDAY)
     val weekDays = (0..6).map { startOfWeek.plusDays(it.toLong()) }
 
-    // single scroll states (don't shadow)
     val verticalScroll = rememberScrollState()
     val horizontalScroll = rememberScrollState()
 
-    // robust time parser (tries multiple formats)
     fun parseEventTimeString(timeStr: String?): LocalTime? {
         if (timeStr.isNullOrBlank()) return null
-        // normalize (e.g. "10:00AM" -> "10:00 AM")
         val t0 = timeStr.trim().replace(Regex("(?i)\\s*(am|pm)\$"), " $1")
         val candidates = listOf(
             DateTimeFormatter.ofPattern("hh:mm a", Locale.ENGLISH),
@@ -92,7 +92,10 @@ fun WeekCalendar(
                     title = entity.title ?: "",
                     startTime = start,
                     endTime = end,
-                    color = entity.color
+                    color = entity.color,
+                    note = entity.note ?: "",
+                    location = entity.location ?: "",
+                    url = entity.url ?: "",
                 )
             }
         }
@@ -207,12 +210,44 @@ private fun DayColumn(
     density: Density
 ) {
     val totalHeight = hourHeight * 24
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             .width(dayWidth)
             .height(totalHeight)
-            .background(if (date == LocalDate.now()) Color(0xFFFFFDE7).copy(alpha = 0.15f) else Color.Transparent)
+            .background(
+                if (date == LocalDate.now())
+                    Color(0xFFFFDA9C).copy(alpha = 0.15f)
+                else Color.Transparent
+            )
             .border(0.5.dp, Color.LightGray.copy(alpha = 0.6f))
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+
+                    val hourHeightPx = with(density) { hourHeight.toPx() }
+                    val hourIndex = (offset.y / hourHeightPx).toInt()
+
+                    val startHour = hourIndex
+                    val endHour = hourIndex + 1
+
+                    val startTime = LocalTime.of(startHour, 0)
+                    val endTime = LocalTime.of(endHour % 24, 0)
+
+                    val formatter = DateTimeFormatter.ofPattern("hh:00 a")
+
+                    val intent = Intent(context, EventActivity::class.java)
+
+                    intent.putExtra("startstime", startTime.format(formatter))
+                    intent.putExtra("endtime", endTime.format(formatter))
+
+                    intent.putExtra(
+                        "date",
+                        date.format(DateTimeFormatter.ofPattern("d/M/yyyy (EEE)"))
+                    )
+
+                    context.startActivity(intent)
+                }
+            }
     ) {
         Column {
             repeat(24) {
@@ -259,12 +294,19 @@ private fun DayColumn(
             Card(
                 onClick = {
                     val intent = Intent(context, EventActivity::class.java)
+                    intent.putExtra("title", event.title)
+                    intent.putExtra("startstime", event.startTime)
+                    intent.putExtra("endtime", event.endTime)
+                    intent.putExtra("note", event.note)
+                    intent.putExtra("url", event.url)
+                    intent.putExtra("location", event.location)
+                    intent.putExtra("date", date.toString())
                     context.startActivity(intent)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset(y = topOffset)
-                    .padding(start = 5.dp, end = 5.dp, top = 8.dp),
+                    .padding(start = 5.dp, end = 5.dp, top = 4.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(event.color)),
                 shape = RoundedCornerShape(6.dp)
             ) {
@@ -286,5 +328,8 @@ data class Event(
     val title: String,
     val startTime: LocalTime,
     val endTime: LocalTime,
-    val color: Int
+    val color: Int,
+    val note: String,
+    val location: String,
+    val url: String,
 )

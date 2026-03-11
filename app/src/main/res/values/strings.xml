@@ -9,4 +9,5 @@
     <string name="title_activity_color_theme">Color_Theme</string>
     <string name="title_activity_setting_page">SettingPage</string>
     <string name="title_activity_selected_date">selectedDate</string>
+    <string name="title_activity_notification">NotificationActivity</string>
 </resources>

@@ -16,40 +16,44 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dateFormatter = DateTimeFormatter.ofPattern("d/M/yyyy (EEE)")
 
-    fun saveEvent(
+    // 👇 Now suspend (no internal launch) – caller will await this
+    suspend fun saveEvent(
         title: String?,
         date: String,
         startstime: String?,
         endtime: String?,
-        color: Int
+        color: Int,
+        location: String?,
+        url: String?,
+        note: String?
     ) {
-        viewModelScope.launch {
-            val calendarId = db.calendarDao().getOrCreateCalendarId()
-            db.eventDao().insertEvent(
-                EventEntity(
-                    title = title,
-                    date = date,
-                    startstime = startstime,
-                    endtime = endtime,
-                    calendarId = calendarId,
-                    color = color
-                )
+        val calendarId = db.calendarDao().getOrCreateCalendarId()
+        db.eventDao().insertEvent(
+            EventEntity(
+                title = title,
+                date = date,
+                startstime = startstime,
+                endtime = endtime,
+                calendarId = calendarId,
+                color = color,
+                location = location,
+                url = url,
+                note = note
             )
-        }
+        )
     }
 
-    fun deleteEvent(eventId: Int) {
-        viewModelScope.launch {
-            db.eventDao().deleteEventById(eventId)
-        }
+    // 👇 Suspend
+    suspend fun updateEvent(event: EventEntity) {
+        db.eventDao().updateEvent(event)
     }
 
-    fun updateEvent(event: EventEntity) {
-        viewModelScope.launch {
-            db.eventDao().updateEvent(event)
-        }
+    // 👇 Suspend
+    suspend fun deleteEvent(eventId: Int) {
+        db.eventDao().deleteEventById(eventId)
     }
 
+    // Events flow remains same (no change needed)
     val eventsByDate: Flow<Map<LocalDate, List<EventEntity>>> =
         db.eventDao().getAllEvents().map { events ->
             events

@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [CalendarEntity::class, EventEntity::class, RegionEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false   // good to add unless you really need schema files
 )
 abstract class CalendarDatabase : RoomDatabase() {

@@ -1,11 +1,16 @@
 package com.example.calendar
 
 import android.Manifest
+import android.app.Activity
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.CalendarContract
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -83,7 +88,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,16 +95,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calendar.RoomDatabase.EventEntity
 import com.example.calendar.RoomDatabase.EventViewModel
 import com.example.calendar.RoomDatabase.colosave.loadThemeColor
+import com.example.calendar.notification.createNotificationChannel
 import com.kizitonwose.calendar.compose.CalendarState
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
@@ -122,33 +130,61 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        createNotificationChannel(this)
+        WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = true
         setContent {
             var hasCalendarPermission by remember {
                 mutableStateOf(
                     ContextCompat.checkSelfPermission(
                         this@MainActivity,
                         Manifest.permission.READ_CALENDAR
-                    ) ==
-                            PackageManager.PERMISSION_GRANTED
+                    ) == PackageManager.PERMISSION_GRANTED
                 )
             }
-            val permissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission()
-            ) { granted ->
-                hasCalendarPermission = granted
-            }
-            if (!hasCalendarPermission) {
-                LaunchedEffect(Unit) {
+
+            val permissionLauncher =
+                rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    hasCalendarPermission = granted
+                }
+
+            LaunchedEffect(hasCalendarPermission) {
+                if (!hasCalendarPermission) {
                     permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
                 }
             }
 
-            val eventViewModel: EventViewModel = viewModel(factory = object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    // We only need to pass the Application (this is what EventViewModel expects)
-                    return EventViewModel(this@MainActivity.application) as T
+            if (!hasCalendarPermission) {
+
+                LaunchedEffect(Unit) {
+
+                    permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            requestPermissions(
+                                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                                101
+                            )
+                        }
+                    }
+                    if (!checkExactAlarmPermission(this@MainActivity)) {
+                        requestExactAlarmPermission(this@MainActivity)
+                    }
                 }
-            })
+
+            }
+
+            val eventViewModel: EventViewModel =
+                viewModel(factory = object : ViewModelProvider.Factory {
+                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                        // We only need to pass the Application (this is what EventViewModel expects)
+                        return EventViewModel(this@MainActivity.application) as T
+                    }
+                })
 
             val eventsMap by eventViewModel.eventsByDate.collectAsState(initial = emptyMap())
             val today = remember { LocalDate.now() }
@@ -192,7 +228,6 @@ class MainActivity : ComponentActivity() {
                         }, onWeekClick = {
                             selectedTab = BottomTab.WEEK
                             month_week_day_cheng = 1
-//                            selectedDate = LocalDate.now()
                         }, onDayClick = {
                             selectedTab = BottomTab.DAY
                             month_week_day_cheng = 2
@@ -235,78 +270,40 @@ class MainActivity : ComponentActivity() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+
                     Text("Calendar permission required")
+
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.READ_CALENDAR) }) {
-                        Text("Grant permission")
+                    val context = LocalContext.current
+
+
+                    Button(onClick = {
+
+                        val activity = context as Activity
+
+                        if (ActivityCompat.shouldShowRequestPermissionRationale(
+                                activity,
+                                Manifest.permission.READ_CALENDAR
+                            )
+                        ) {
+                            permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+                        } else {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            intent.data = Uri.fromParts("package", context.packageName, null)
+                            context.startActivity(intent)
+                        }
+
+                    }) {
+                        Text("Grant Permission")
                     }
                 }
             }
         }
     }
-
 
     data class CalendarHoliday(
         val date: LocalDate, val title: String
     )
-
-    @Composable
-    fun CalendarPermissionScreen(
-        calendarState: CalendarState,
-        eventsMap: Map<LocalDate, List<EventEntity>>,
-        eventViewModel: EventViewModel
-    ) {
-        val context = LocalContext.current
-        var permissionGranted by remember { mutableStateOf(false) }
-        var permissionDenied by remember { mutableStateOf(false) }
-
-        var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-
-        val launcher =
-            rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                permissionGranted = granted
-                permissionDenied = !granted
-            }
-
-        LaunchedEffect(Unit) {
-            val granted = ContextCompat.checkSelfPermission(
-                context, Manifest.permission.READ_CALENDAR
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (granted) permissionGranted = true
-            else launcher.launch(Manifest.permission.READ_CALENDAR)
-        }
-
-        when {
-            permissionGranted -> {
-                Column(modifier = Modifier.fillMaxSize()) {
-
-                    CalendarScreen(
-                        calendarState = calendarState,
-                        selectedDate = selectedDate,
-                        onDateSelected = { selectedDate = it },
-                        eventsMap = eventsMap,
-                        eventViewModel = eventViewModel
-                    )
-
-                    var selectedTab by remember {
-                        mutableStateOf(BottomTab.DAY)
-                    }
-
-                    BottomBar(
-                        selected = selectedTab, onTodayClick = {
-                            selectedDate = LocalDate.now()
-                        })
-                }
-            }
-
-            permissionDenied -> PermissionDeniedUI {
-                launcher.launch(Manifest.permission.READ_CALENDAR)
-            }
-
-            else -> LoadingUI()
-        }
-    }
 
     val indiaHolidayMap: Map<LocalDate, String> = mapOf(
         LocalDate.of(2025, 1, 26) to "Republic Day",
@@ -348,6 +345,7 @@ class MainActivity : ComponentActivity() {
         eventViewModel: EventViewModel
     ) {
         val context = LocalContext.current
+        val scope = rememberCoroutineScope()
         val holidays = remember(context) {
             getIndiaHolidays(
                 context, LocalDate.now().minusMonths(12), LocalDate.now().plusMonths(12)
@@ -457,10 +455,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(60.dp)
-                                        .animateItem(
-                                            fadeInSpec = tween(400), placementSpec = tween(500)
-                                        ),
+                                        .height(60.dp),
                                     shape = RectangleShape,
                                     colors = CardDefaults.cardColors(containerColor = Color.White),
                                     border = BorderStroke(0.5.dp, Color.LightGray)
@@ -622,7 +617,10 @@ class MainActivity : ComponentActivity() {
                                                     showMenuForThisEvent = false
                                                 })
                                             DropdownMenuItem(text = { Text("Delete") }, onClick = {
-                                                eventViewModel.deleteEvent(event.id)
+                                                scope.launch {
+                                                    eventViewModel.deleteEvent(event.id)
+                                                }
+                                                showMenuForThisEvent = false
                                             })
                                         }
                                     }
@@ -796,31 +794,6 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun PermissionDeniedUI(onRetry: () -> Unit) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text("Calendar permission is required ❌")
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onRetry) {
-                Text("Grant Permission")
-            }
-        }
-    }
-
-    @Composable
-    fun LoadingUI() {
-        Box(
-            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
-    }
-
-
-    @Composable
     fun DaysOfWeekRow() {
         Row(modifier = Modifier.fillMaxWidth()) {
             DayOfWeek.entries.forEach {
@@ -859,9 +832,9 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
 
         val headerText = when (month_week_day_cheng) {
-            0 -> selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
-            1 -> selectedDate.format(DateTimeFormatter.ofPattern("dd MMMM yyyy"))
-            else -> selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd MMMM"))
+            0 -> month.format(DateTimeFormatter.ofPattern("MMMM yyyy")) // month view
+            1 -> selectedDate.format(DateTimeFormatter.ofPattern("dd MMMM yyyy")) // day view
+            else -> selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd MMMM")) // week view
         }
 
         Row(
@@ -1032,5 +1005,25 @@ class MainActivity : ComponentActivity() {
             )
         )
     }
+
+    fun checkExactAlarmPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager =
+                context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
+        }
+    }
+
+
+    fun requestExactAlarmPermission(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val intent = Intent().apply {
+                action = Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+            context.startActivity(intent)
+        }
+    }
 }
-    
